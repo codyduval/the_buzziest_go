@@ -1,17 +1,3 @@
-package main
-
-import (
-	"fmt"
-	"github.com/gorilla/mux"
-	"net/http"
-	"os"
-)
-
-func newBuzzSource(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, buzzSourceForm)
-}
-
-const buzzSourceForm = `
   <!DOCTYPE html>
     <html>
       <head>
@@ -41,10 +27,3 @@ const buzzSourceForm = `
       </body>
     </html>
 `
-
-func main() {
-	r := mux.NewRouter()
-	r.HandleFunc("/", HomeHandler)
-	r.HandleFunc("/buzz_sources", BuzzSourcesHandler)
-	http.Handle("/", r)
-}
