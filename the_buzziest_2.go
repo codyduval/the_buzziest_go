@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/unrolled/render"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -66,8 +67,8 @@ const buzzSourceForm = `
 `
 
 func main() {
-	// We need this object to establish a session to our MongoDB.
 	rend := render.New()
+	// We need this object to establish a session to our MongoDB.
 	dbSession := getSession()
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", HomeHandler)
@@ -104,7 +105,7 @@ func getSession() *mgo.Session {
 		var err error
 		mgoSession, err = mgo.Dial("localhost")
 		if err != nil {
-			panic(err) // no, not really
+			panic(err)
 		}
 	}
 	return mgoSession.Copy()
@@ -116,6 +117,7 @@ func HomeHandler(rw http.ResponseWriter, r *http.Request) {
 
 func BuzzSourcesIndexHandler(rend *render.Render) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		// Just a test to see how to output JSON
 		rend.JSON(rw, http.StatusOK, map[string]string{"hello": "json"})
 	}
 }
@@ -123,11 +125,32 @@ func BuzzSourcesIndexHandler(rend *render.Render) func(http.ResponseWriter, *htt
 func BuzzSourcesCreateHandler(session *mgo.Session) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
 
+		err := r.ParseForm()
+		entry := NewBuzzSource()
+
+		if err != nil {
+			// Handle error
+		}
+
+		decoder := schema.NewDecoder()
+		err = decoder.Decode(entry, r.PostForm)
+		fmt.Println(entry)
+
+		if err != nil {
+			// Handle error
+		}
+
+		// Do something with person.Name or person.Phone
+
 		collection := session.DB("test").C("buzz_sources")
 
-		entry := NewBuzzSource()
-		entry.Name = r.FormValue("name")
-		fmt.Println(entry)
+		// entry.Name = r.FormValue("name")
+		// entry.Uri = r.FormValue("uri")
+		// entry.BuzzWeight = r.FormValue("buzz_weight")
+		// entry.XPathNodes = r.FormValue("x_path_nodes")
+		// entry.SourceType = r.FormValue("source_type")
+		// entry.DecayFactor = r.FormValue("decay_factor")
+		// entry.City = r.FormValue("city")
 
 		if err := collection.Insert(entry); err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
