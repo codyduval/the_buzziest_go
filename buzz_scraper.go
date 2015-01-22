@@ -2,42 +2,23 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/xmlpath.v2"
 	"log"
 	"net/http"
-	"time"
 )
 
-type (
-	BlogPost struct {
-		ID      bson.ObjectId `bson:"_id,omitempty"`
-		Date    time.Time     `bson:"date"`
-		Uri     string        `bson:"uri"`
-		Content string        `bson:"content"`
-		Title   string        `bson:"title"`
-		Source  string        `bson:"source"`
-		Guid    string        `bson:"guid"`
-	}
-)
+var numOfPages = 2
 
 func main() {
+	// var xpath string
 
-	var url string
-	var xpath string
-	pages_to_pull := 5
-
-	for page := 1; page <= pages_to_pull; page++ {
-		url = fmt.Sprintf("http://www.tastingtable.com/dispatch/national/dispatch?applyFilter=true&filterEditionId=1&filterNeighborhoodId=0&filterDropDown1=opened&requestedPage=%v", page)
-
-		response := make(chan *http.Response)
-		go fetchPage(url, response)
-		root := parsePage(response)
-
+	responses := fetchPages(numOfPages)
+	for i := 1; i <= numOfPages; i++ {
+		response := <-responses
 		for node := 2; node <= 6; node++ {
-			xpath = fmt.Sprintf("//*[@id='dispatch']/div[1]/div[6]/div[4]/div[%v]/div/h1", node)
+			xpath := fmt.Sprintf("//*[@id='dispatch']/div[1]/div[6]/div[4]/div[%v]/div/h1", node)
 
-			name := scrapePage(root, xpath)
+			name := scrapePage(response, xpath)
 			fmt.Println("Found:", name)
 
 		}
@@ -45,15 +26,25 @@ func main() {
 
 }
 
-func fetchPage(url string, response chan *http.Response) {
-	r, err := http.Get(url)
-	if err != nil {
-		fmt.Printf("%s", err)
+func fetchPages(numOfPages int) <-chan *xmlpath.Node {
+	ch := make(chan *xmlpath.Node) // buffered
+	for page := 1; page <= numOfPages; page++ {
+		url := fmt.Sprintf("http://www.tastingtable.com/dispatch/national/dispatch?applyFilter=true&filterEditionId=1&filterNeighborhoodId=0&filterDropDown1=opened&requestedPage=%v", page)
+		go func(url string) {
+			fmt.Printf("Fetching %s \n", url)
+			resp, err := http.Get(url)
+			if err != nil {
+				fmt.Println("Something went wrong!")
+				log.Fatal(err)
+			}
+			root := parsePage(resp)
+			ch <- root
+		}(url)
 	}
-	response <- r
+	return ch
 }
 
-func parsePage(r chan *http.Response) *xmlpath.Node {
+func parsePage(r *http.Response) *xmlpath.Node {
 
 	root, err := xmlpath.ParseHTML(r.Body)
 	if err != nil {
