@@ -5,23 +5,57 @@ import (
 	"gopkg.in/xmlpath.v2"
 	"log"
 	"net/http"
+	"time"
 )
 
-var numOfPages = 2
-
 func main() {
-	// var xpath string
+	var i int
 
-	responses := fetchPages(numOfPages)
-	for i := 1; i <= numOfPages; i++ {
-		response := <-responses
-		for node := 2; node <= 6; node++ {
-			xpath := fmt.Sprintf("//*[@id='dispatch']/div[1]/div[6]/div[4]/div[%v]/div/h1", node)
+	fmt.Println("How many pages to grab?")
+	_, err := fmt.Scanf("%d", &i)
+	if err != nil {
+		fmt.Println(err)
+	}
+	numOfPages := i
+	fmt.Println("Concurrent(1) or Sequential(2):")
+	_, err = fmt.Scanf("%d", &i)
+	if err != nil {
+		fmt.Println(err)
+	}
+	conOrSeq := i
 
-			name := scrapePage(response, xpath)
-			fmt.Println("Found:", name)
+	if conOrSeq == 1 {
+
+		start := time.Now()
+
+		responses := fetchPages(numOfPages)
+		for i := 1; i <= numOfPages; i++ {
+			response := <-responses
+			for node := 2; node <= 6; node++ {
+				xpath := fmt.Sprintf("//*[@id='dispatch']/div[1]/div[6]/div[4]/div[%v]/div/h1", node)
+
+				name := scrapePage(response, xpath)
+				fmt.Println("Found:", name)
+			}
+		}
+		elapsed := time.Since(start)
+		log.Printf("Concurrent took %s", elapsed)
+	} else {
+		start := time.Now()
+		for page := 1; page <= numOfPages; page++ {
+			url := fmt.Sprintf("http://www.tastingtable.com/dispatch/national/dispatch?applyFilter=true&filterEditionId=1&filterNeighborhoodId=0&filterDropDown1=opened&requestedPage=%v", page)
+			response := fetchPage(url)
+			root := parsePage(response)
+			for node := 2; node <= 6; node++ {
+				xpath := fmt.Sprintf("//*[@id='dispatch']/div[1]/div[6]/div[4]/div[%v]/div/h1", node)
+
+				name := scrapePage(root, xpath)
+				fmt.Println("Found:", name)
+			}
 
 		}
+		elapsed := time.Since(start)
+		log.Printf("Sequential took %s", elapsed)
 	}
 
 }
@@ -42,6 +76,16 @@ func fetchPages(numOfPages int) <-chan *xmlpath.Node {
 		}(url)
 	}
 	return ch
+}
+
+func fetchPage(url string) *http.Response {
+	fmt.Printf("Fetching %s \n", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("Something went wrong!")
+		log.Fatal(err)
+	}
+	return resp
 }
 
 func parsePage(r *http.Response) *xmlpath.Node {
